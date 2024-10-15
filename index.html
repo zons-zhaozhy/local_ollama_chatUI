@@ -25,6 +25,7 @@
             margin: 0 auto;
             background-color: #fff;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 0 10px; /* 添加左右内边距 */
         }
         .chat-header {
             padding: 15px;
@@ -50,23 +51,34 @@
             flex-direction: column;
         }
         .message {
+            position: relative;
             max-width: 80%;
-            padding: 8px 12px;
+            padding: 8px 12px 24px 12px;
             margin-bottom: 8px;
             border-radius: 18px;
             font-size: 0.9rem;
             line-height: 1.4;
+            word-wrap: break-word;
         }
         .user {
             align-self: flex-end;
             background-color: #dcf8c6;
+            margin-left: 20%; /* 为用户消息添加左边距 */
         }
         .assistant {
             align-self: flex-start;
             background-color: #fff;
             border: 1px solid #e0e0e0;
+            margin-right: 20%;
+            padding-left: 20px; /* 增加左侧内边距 */
         }
-        .message .content { margin-top: 4px; }
+        .message .content {
+            margin-top: 4px;
+        }
+        .message .content ol,
+        .message .content ul {
+            padding-left: 20px; /* 为列表增加左侧内边距 */
+        }
         .message .response-time {
             font-size: 0.7rem;
             color: #888;
@@ -91,12 +103,14 @@
         }
         #inputMessage {
             flex-grow: 1;
-            height: 40px;
+            min-height: 40px; /* 初始两行高度 */
+            max-height: 120px; /* 最大6行高度 */
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 20px;
             font-size: 0.9rem;
             resize: none;
+            overflow-y: auto; /* 添加垂直滚动条 */
         }
         #sendButton {
             margin-left: 10px;
@@ -119,6 +133,9 @@
             padding: 5px 10px;
             border-radius: 15px;
             font-size: 0.8rem;
+        }
+        .content-block {
+            position: relative;
         }
     </style>
 </head>
@@ -190,7 +207,7 @@
                     selectedModel = modelNames[0];
                 }
             } catch (error) {
-                console.error('获取模型列表失败:', error);
+                console.error('获取模型列表失:', error);
                 alert('获取模型列表失败,请检查 Ollama 服务是否正在运行');
             }
         }
@@ -226,7 +243,7 @@
                 await streamResponse(response, startTime);
             } catch (error) {
                 console.error('发送消息失败:', error);
-                addMessage('assistant', '发送消息失败,请稍后重试。');
+                addMessage('assistant', '送消息失败,请稍后重试。');
             } finally {
                 isGenerating = false;
                 generatingStatusEl.textContent = '';
@@ -278,16 +295,43 @@
         function addMessage(role, content) {
             const messageEl = document.createElement('div');
             messageEl.className = `message ${role}`;
-            messageEl.innerHTML = `
-                <strong>${role === 'user' ? '你: ' : 'AI: '}</strong>
-                <div class="content">${marked.parse(content)}</div>
-                <div class="response-time"></div>
-            `;
+            messageEl.innerHTML = `<strong>${role === 'user' ? '我: ' : 'AI: '}</strong>`;
+            
+            const contentEl = document.createElement('div');
+            contentEl.className = 'content';
+            messageEl.appendChild(contentEl);
+
+            if (role === 'assistant') {
+                const blocks = splitContentIntoBlocks(content);
+                blocks.forEach(block => {
+                    const blockEl = document.createElement('div');
+                    blockEl.className = 'content-block';
+                    blockEl.innerHTML = marked.parse(block);
+                    contentEl.appendChild(blockEl);
+                });
+            } else {
+                contentEl.innerHTML = marked.parse(content);
+            }
+
+            messageEl.appendChild(contentEl);
+            messageEl.innerHTML += '<div class="response-time"></div>';
             messageListEl.appendChild(messageEl);
             messageListEl.scrollTop = messageListEl.scrollHeight;
             Prism.highlightAllUnder(messageEl);
+
             return messageEl;
         }
+
+        function splitContentIntoBlocks(content) {
+            return content.split(/(\n```[\s\S]*?\n```|\n\n)/g).filter(block => block.trim() !== '');
+        }
+
+        // 添加输入框自动调整大小的功能
+        inputMessageEl.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
 
         sendButtonEl.addEventListener('click', sendMessage);
         inputMessageEl.addEventListener('keydown', (event) => {
